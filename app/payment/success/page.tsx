@@ -1,11 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
     const params = useSearchParams();
     const authKey = params.get("authKey");
     const customerKey = params.get("customerKey");
@@ -57,7 +57,6 @@ export default function PaymentSuccessPage() {
     };
 
     const confirmPayment = async () => {
-        // ... (이전 코드 재사용 또는 생략 가능하지만 유지) ...
         try {
             const response = await fetch("/api/payment/confirm", {
                 method: "POST",
@@ -132,7 +131,6 @@ export default function PaymentSuccessPage() {
                         <div className="flex justify-between items-center">
                             <span className="text-slate-500 dark:text-slate-400 text-sm">다음 결제일</span>
                             <span className="font-semibold text-sm text-primary">
-                                {/* 30일 뒤 날짜 (간단 계산) */}
                                 {new Date(new Date().setDate(new Date().getDate() + 30)).toLocaleDateString()}
                             </span>
                         </div>
@@ -151,5 +149,17 @@ export default function PaymentSuccessPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function PaymentSuccessPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen text-lg font-medium text-slate-600">
+                로딩 중...
+            </div>
+        }>
+            <PaymentSuccessContent />
+        </Suspense>
     );
 }
