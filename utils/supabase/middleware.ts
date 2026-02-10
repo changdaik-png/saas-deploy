@@ -7,33 +7,33 @@ export async function updateSession(request: NextRequest) {
     });
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+    const supabaseAnonKey =
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
-    // 환경 변수가 없으면 미들웨어를 건너뜀 (빌드 시 또는 설정 누락 시 안전 처리)
+    // 환경 변수가 없으면 미들웨어를 건너뜀
     if (!supabaseUrl || !supabaseAnonKey) {
         console.warn("Supabase env vars not found, skipping middleware.");
         return supabaseResponse;
     }
 
     try {
-        const supabase = createServerClient(
-            supabaseUrl,
-            supabaseAnonKey,
-            {
-                cookies: {
-                    getAll() {
-                        return request.cookies.getAll();
-                    },
-                    setAll(cookiesToSet) {
-                        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-                        supabaseResponse = NextResponse.next({ request });
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            supabaseResponse.cookies.set(name, value, options)
-                        );
-                    },
+        const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+            cookies: {
+                getAll() {
+                    return request.cookies.getAll();
                 },
-            }
-        );
+                setAll(cookiesToSet) {
+                    cookiesToSet.forEach(({ name, value }) =>
+                        request.cookies.set(name, value)
+                    );
+                    supabaseResponse = NextResponse.next({ request });
+                    cookiesToSet.forEach(({ name, value, options }) =>
+                        supabaseResponse.cookies.set(name, value, options)
+                    );
+                },
+            },
+        });
 
         const {
             data: { user },
@@ -70,7 +70,6 @@ export async function updateSession(request: NextRequest) {
                     .eq("user_id", user.id)
                     .single();
 
-                // 구독 활성 또는 취소됐지만 기간 남은 경우 -> 통과
                 if (subscription) {
                     const isActive = subscription.status === "active";
                     const isCanceledButValid =
@@ -82,12 +81,10 @@ export async function updateSession(request: NextRequest) {
                     }
                 }
 
-                // 구독 없음 또는 만료 -> 결제 페이지로
                 const url = request.nextUrl.clone();
                 url.pathname = "/payment";
                 return NextResponse.redirect(url);
             } catch {
-                // DB 조회 실패 시 안전하게 통과 (테이블 없는 경우 등)
                 return supabaseResponse;
             }
         }
