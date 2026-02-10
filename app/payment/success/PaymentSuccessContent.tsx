@@ -7,6 +7,9 @@ import Card from "../../components/ui/Card";
 
 export default function PaymentSuccessContent() {
     const params = useSearchParams();
+    // Safety check for params
+    if (!params) return null;
+
     const authKey = params.get("authKey");
     const customerKey = params.get("customerKey");
 
