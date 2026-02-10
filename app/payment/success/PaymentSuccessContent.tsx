@@ -1,22 +1,24 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 
-export default function PaymentSuccessContent() {
-    const params = useSearchParams();
-    // Safety check for params
-    if (!params) return null;
+interface PaymentSuccessContentProps {
+    authKey: string | null;
+    customerKey: string | null;
+    paymentKey: string | null;
+    orderId: string | null;
+    amount: string | null;
+}
 
-    const authKey = params.get("authKey");
-    const customerKey = params.get("customerKey");
-
-    const paymentKey = params.get("paymentKey");
-    const orderId = params.get("orderId");
-    const amount = params.get("amount");
-
+export default function PaymentSuccessContent({
+    authKey,
+    customerKey,
+    paymentKey,
+    orderId,
+    amount,
+}: PaymentSuccessContentProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [successData, setSuccessData] = useState<any>(null);
