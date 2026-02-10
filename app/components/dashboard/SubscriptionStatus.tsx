@@ -7,33 +7,24 @@ import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Badge from "../ui/Badge";
 
-export default function SubscriptionStatus() {
-    const [subscription, setSubscription] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+interface SubscriptionStatusProps {
+    initialSubscription?: any;
+}
+
+export default function SubscriptionStatus({ initialSubscription }: SubscriptionStatusProps) {
+    const [subscription, setSubscription] = useState<any>(initialSubscription);
+    const [loading, setLoading] = useState(!initialSubscription);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const [cancelLoading, setCancelLoading] = useState(false);
 
     const supabase = createClient();
 
-    const fetchSubscription = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data, error } = await supabase
-            .from("subscriptions")
-            .select("*")
-            .eq("user_id", user.id)
-            .single();
-
-        if (!error && data) {
-            setSubscription(data);
-        }
-        setLoading(false);
-    };
-
     useEffect(() => {
-        fetchSubscription();
-    }, []);
+        setSubscription(initialSubscription);
+        if (initialSubscription !== undefined) {
+            setLoading(false);
+        }
+    }, [initialSubscription]);
 
     const handleCancelSubscription = async () => {
         setCancelLoading(true);
@@ -47,7 +38,9 @@ export default function SubscriptionStatus() {
             }
 
             alert("구독이 취소되었습니다. 다음 결제일 전까지 혜택은 유지됩니다.");
-            await fetchSubscription(); // 상태 갱신
+
+            // 취소 후 상태 갱신 - 로컬 상태 업데이트
+            setSubscription((prev: any) => ({ ...prev, status: "canceled" }));
             setShowCancelDialog(false);
 
         } catch (error) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 
@@ -23,17 +23,30 @@ export default function PaymentSuccessContent({
     const [error, setError] = useState<string | null>(null);
     const [successData, setSuccessData] = useState<any>(null);
 
+    const processedRef = useRef(false);
+
     useEffect(() => {
+        if (processedRef.current) return;
+
         if (authKey && customerKey) {
+            processedRef.current = true;
             confirmBilling();
             return;
         }
         if (paymentKey && orderId && amount) {
+            processedRef.current = true;
             confirmPayment();
             return;
         }
-        setLoading(false);
-        setError("잘못된 접근입니다.");
+
+        // 파라미터가 없는 경우에만 에러 처리 (하지만 strict mode로 인해 두 번 실행될 때 초기엔 null일 수도 있어 주의 필요)
+        // 여기서는 파라미터가 아예 없으면 에러로 간주하되, 
+        // useEffect가 의존성 배열 변경으로 다시 실행될 수 있으므로 조심스럽게 처리
+        const hasParams = (authKey && customerKey) || (paymentKey && orderId && amount);
+        if (!hasParams) {
+            setLoading(false);
+            setError("잘못된 접근입니다.");
+        }
     }, [authKey, customerKey, paymentKey, orderId, amount]);
 
     const confirmBilling = async () => {

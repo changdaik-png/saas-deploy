@@ -1,16 +1,45 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Logo from "../components/ui/Logo";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
+import { createClient } from "../../utils/supabase/client";
 
 import SubscriptionStatus from "../components/dashboard/SubscriptionStatus";
 
 export default function DashboardPage() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [subscription, setSubscription] = useState<any>(null);
+    const [user, setUser] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    const supabase = createClient();
+
+    useEffect(() => {
+        const fetchData = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUser(user);
+                // 구독 정보 가져오기
+                const { data, error } = await supabase
+                    .from("subscriptions")
+                    .select("*")
+                    .eq("user_id", user.id)
+                    .single();
+
+                if (!error && data) {
+                    setSubscription(data);
+                }
+            }
+            setLoading(false);
+        };
+        fetchData();
+    }, []);
+
+    const isPro = subscription?.status === "active";
 
     return (
         <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-sans min-h-screen flex flex-col">
@@ -31,16 +60,25 @@ export default function DashboardPage() {
                         <span className="material-icons">notifications_none</span>
                         <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-surface-dark"></span>
                     </Button>
-                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border border-slate-300 dark:border-slate-600">
-                        {/* User Avatar Placeholder */}
-                        <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs font-bold">U</div>
+                    <div className="relative">
+                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border border-slate-300 dark:border-slate-600">
+                            {/* User Avatar Placeholder */}
+                            <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs font-bold">
+                                {user?.email?.[0].toUpperCase() || "U"}
+                            </div>
+                        </div>
+                        {isPro && (
+                            <span className="absolute -bottom-1 -right-1 bg-primary text-white text-[8px] font-bold px-1 rounded-sm border border-white dark:border-surface-dark">
+                                PRO
+                            </span>
+                        )}
                     </div>
                 </div>
             </header>
             <main className="flex-1 overflow-y-auto px-4 py-6 max-w-lg mx-auto w-full pb-24">
                 <section className="mb-8">
-                    <h1 className="text-2xl font-bold mb-1">
-                        안녕하세요, <span className="text-primary">김민수님</span> 👋
+                    <h1 className="text-2xl font-bold mb-1 flex items-center gap-2">
+                        안녕하세요, <span className="text-primary">{user?.user_metadata?.full_name || "사용자"}님</span> 👋
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-sm">오늘의 영감을 기록해보세요.</p>
                 </section>
@@ -59,14 +97,15 @@ export default function DashboardPage() {
                             <span className="material-icons text-lg">cloud</span>
                         </div>
                         <div>
-                            <span className="text-2xl font-bold">24%</span>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">저장 공간 (1.2GB)</p>
+                            <span className="text-2xl font-bold">{isPro ? "무제한" : "24%"}</span>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">저장 공간 {isPro ? "" : "(1.2GB)"}</p>
                         </div>
                     </Card>
                 </section>
 
                 {/* 구독 상태 컴포넌트 */}
-                <SubscriptionStatus />
+                <SubscriptionStatus initialSubscription={subscription} />
+
                 <section className="mb-8">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-lg">최근 활동</h3>
@@ -223,13 +262,22 @@ export default function DashboardPage() {
                             </Button>
                         </div>
                         <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl mb-6">
-                            <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border border-slate-300 dark:border-slate-600">
-                                {/* Placeholder Avatar */}
-                                <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs font-bold">U</div>
+                            <div className="relative">
+                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border border-slate-300 dark:border-slate-600">
+                                    {/* Placeholder Avatar */}
+                                    <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs font-bold">
+                                        {user?.email?.[0].toUpperCase() || "U"}
+                                    </div>
+                                </div>
+                                {isPro && (
+                                    <span className="absolute -bottom-1 -right-1 bg-primary text-white text-[8px] font-bold px-1 rounded-sm border border-white dark:border-surface-dark">
+                                        PRO
+                                    </span>
+                                )}
                             </div>
                             <div>
-                                <h4 className="font-bold text-sm">김민수</h4>
-                                <p className="text-xs text-slate-500">minsu@cloudnote.app</p>
+                                <h4 className="font-bold text-sm">{user?.user_metadata?.full_name || "사용자"}</h4>
+                                <p className="text-xs text-slate-500">{user?.email}</p>
                             </div>
                         </div>
                         <nav className="flex-1 space-y-1">
@@ -260,20 +308,22 @@ export default function DashboardPage() {
                                 </Button>
                             </div>
                         </nav>
-                        <div className="mt-auto">
-                            <Card className="bg-primary/5 border-primary/20">
-                                <div className="flex items-start gap-3 mb-3">
-                                    <span className="material-icons text-primary">auto_awesome</span>
-                                    <div>
-                                        <h5 className="font-bold text-sm text-primary">PRO 업그레이드</h5>
-                                        <p className="text-[10px] text-slate-500 mt-1">무제한 용량과 AI 기능을 경험해보세요.</p>
+                        {!isPro && (
+                            <div className="mt-auto">
+                                <Card className="bg-primary/5 border-primary/20">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <span className="material-icons text-primary">auto_awesome</span>
+                                        <div>
+                                            <h5 className="font-bold text-sm text-primary">PRO 업그레이드</h5>
+                                            <p className="text-[10px] text-slate-500 mt-1">무제한 용량과 AI 기능을 경험해보세요.</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <Link href="/payment">
-                                    <Button size="sm" fullWidth>업그레이드</Button>
-                                </Link>
-                            </Card>
-                        </div>
+                                    <Link href="/payment">
+                                        <Button size="sm" fullWidth>업그레이드</Button>
+                                    </Link>
+                                </Card>
+                            </div>
+                        )}
                     </div>
                 </aside>
             </div>
