@@ -1,6 +1,6 @@
 "use client";
 
-import { loadTossPayments } from "@tosspayments/payment-sdk";
+import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import { useState } from "react";
 import Button from "../ui/Button";
 import { createClient } from "../../../utils/supabase/client";
@@ -23,8 +23,7 @@ export default function TossBillingWidget() {
         }
 
         try {
-            const tossPayments = await loadTossPayments(clientKey);
-
+            // 1. 유저 정보 먼저 가져오기
             const { data: { user }, error: authError } = await supabase.auth.getUser();
 
             if (authError || !user) {
@@ -36,10 +35,17 @@ export default function TossBillingWidget() {
             const prefix = process.env.NEXT_PUBLIC_TOSS_CUSTOMER_KEY_PREFIX || "USER_";
             const customerKey = `${prefix}${user.id}`;
 
-            await tossPayments.requestBillingAuth("카드", {
-                customerKey,
+            // 2. v2 SDK 초기화 (customerKey를 함께 전달)
+            const tossPayments = await loadTossPayments(clientKey);
+            const payment = tossPayments.payment({ customerKey });
+
+            // 3. v2 방식으로 빌링 인증 요청
+            await payment.requestBillingAuth({
+                method: "CARD",
                 successUrl: `${window.location.origin}/payment/success`,
                 failUrl: `${window.location.origin}/payment/fail`,
+                customerEmail: user.email,
+                customerName: user.user_metadata?.full_name || user.email?.split("@")[0],
             });
 
         } catch (err: any) {
