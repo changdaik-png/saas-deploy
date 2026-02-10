@@ -6,93 +6,95 @@ export async function updateSession(request: NextRequest) {
         request,
     });
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll();
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
-                    // Check if supabaseResponse is already modified (not typical in this snippet, but good for safety)
-                    supabaseResponse = NextResponse.next({ request });
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
-                    );
-                },
-            },
-        }
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    const path = request.nextUrl.pathname;
-
-    // 1. 비로그인 사용자: 보호된 라우트 접근 시 로그인 페이지로 리다이렉트
-    if (
-        !user &&
-        (path.startsWith("/dashboard") ||
-            path.startsWith("/note") ||
-            path.startsWith("/payment") ||
-            path.startsWith("/notes"))
-    ) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/login";
-        return NextResponse.redirect(url);
+    // 환경 변수가 없으면 미들웨어를 건너뜀 (빌드 시 또는 설정 누락 시 안전 처리)
+    if (!supabaseUrl || !supabaseAnonKey) {
+        console.warn("Supabase env vars not found, skipping middleware.");
+        return supabaseResponse;
     }
 
-    // 2. 로그인 사용자: 로그인/회원가입 페이지 접근 시 대시보드로 이동
-    if (user && (path.startsWith("/login") || path.startsWith("/signup"))) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
-    }
+    try {
+        const supabase = createServerClient(
+            supabaseUrl,
+            supabaseAnonKey,
+            {
+                cookies: {
+                    getAll() {
+                        return request.cookies.getAll();
+                    },
+                    setAll(cookiesToSet) {
+                        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+                        supabaseResponse = NextResponse.next({ request });
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            supabaseResponse.cookies.set(name, value, options)
+                        );
+                    },
+                },
+            }
+        );
 
-    // 3. 로그인 했지만 구독이 없는 사용자 및 권한 테스트
-    if (user && (path.startsWith("/note") || path.startsWith("/notes"))) {
-        // [TESTING ONLY] test2@test.com 계정은 무조건 구독자로 간주 (Mocking)
-        if (user.email === "test2@test.com") {
-            return supabaseResponse; // 통과
-        }
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
 
-        // [TESTING ONLY] test1@test.com 계정은 무조건 미구독자로 간주
-        if (user.email === "test1@test.com") {
+        const path = request.nextUrl.pathname;
+
+        // 1. 비로그인 사용자: 보호된 라우트 접근 시 로그인 페이지로 리다이렉트
+        if (
+            !user &&
+            (path.startsWith("/dashboard") ||
+                path.startsWith("/note") ||
+                path.startsWith("/payment") ||
+                path.startsWith("/notes"))
+        ) {
             const url = request.nextUrl.clone();
-            url.pathname = "/payment";
+            url.pathname = "/login";
             return NextResponse.redirect(url);
         }
 
-        try {
-            // 실제 DB 조회 (테이블이 없으면 에러 발생 가능하므로 try-catch)
-            const { data: subscription } = await supabase
-                .from("subscriptions")
-                .select("status")
-                .eq("user_id", user.id)
-                .in("status", ["active", "trialing"])
-                .single();
+        // 2. 로그인 사용자: 로그인/회원가입 페이지 접근 시 대시보드로 이동
+        if (user && (path.startsWith("/login") || path.startsWith("/signup"))) {
+            const url = request.nextUrl.clone();
+            url.pathname = "/dashboard";
+            return NextResponse.redirect(url);
+        }
 
-            if (!subscription) {
-                /* subscription check disabled temporarily if table doesn't exist for general users 
-                   But since we are precise testing test1/test2, this block is less critical for them.
-                   We keep the logic for others. 
-                */
+        // 3. 구독 체크 (노트 관련 경로만)
+        if (user && (path.startsWith("/note") || path.startsWith("/notes"))) {
+            try {
+                const { data: subscription } = await supabase
+                    .from("subscriptions")
+                    .select("status, current_period_end")
+                    .eq("user_id", user.id)
+                    .single();
+
+                // 구독 활성 또는 취소됐지만 기간 남은 경우 -> 통과
+                if (subscription) {
+                    const isActive = subscription.status === "active";
+                    const isCanceledButValid =
+                        subscription.status === "canceled" &&
+                        new Date(subscription.current_period_end) > new Date();
+
+                    if (isActive || isCanceledButValid) {
+                        return supabaseResponse;
+                    }
+                }
+
+                // 구독 없음 또는 만료 -> 결제 페이지로
                 const url = request.nextUrl.clone();
                 url.pathname = "/payment";
                 return NextResponse.redirect(url);
+            } catch {
+                // DB 조회 실패 시 안전하게 통과 (테이블 없는 경우 등)
+                return supabaseResponse;
             }
-        } catch (error) {
-            // 테이블이 없거나 에러 발생 시 안전하게 결제 페이지로 이동 or 통과 (정책에 따라 다름)
-            // 여기서는 안전하게 결제로 보냄
-            console.error("Subscription check failed:", error);
-            const url = request.nextUrl.clone();
-            url.pathname = "/payment";
-            return NextResponse.redirect(url);
         }
-    }
 
-    return supabaseResponse;
+        return supabaseResponse;
+    } catch (error) {
+        console.error("Middleware error:", error);
+        return supabaseResponse;
+    }
 }
