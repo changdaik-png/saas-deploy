@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Supabase Client 생성 (이 API를 호출한 유저 정보 확인용)
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
         data: { user },
     } = await supabase.auth.getUser();
