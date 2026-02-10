@@ -10,6 +10,11 @@ import TossBillingWidget from "../components/payment/TossBillingWidget";
 export default function PaymentPage() {
     const router = useRouter();
     const [isCheckout, setIsCheckout] = useState(false);
+    const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
+
+    const price = billingCycle === "monthly" ? "9,900" : "99,000";
+    const priceLabel = billingCycle === "monthly" ? "월" : "연";
+    const discount = billingCycle === "yearly" ? "(월 8,250원, 17% 할인)" : "";
 
     return (
         <div className="bg-background-light dark:bg-background-dark font-sans text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
@@ -37,10 +42,22 @@ export default function PaymentPage() {
                         </div>
                         <div className="flex justify-center mb-8">
                             <div className="bg-slate-200/50 dark:bg-primary/5 p-1 rounded-xl flex w-full max-w-[240px]">
-                                <button className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-white dark:bg-primary shadow-sm text-slate-900 dark:text-white transition-all">
+                                <button
+                                    onClick={() => setBillingCycle("monthly")}
+                                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${billingCycle === "monthly"
+                                            ? "bg-white dark:bg-primary shadow-sm text-slate-900 dark:text-white"
+                                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                        }`}
+                                >
                                     월간 결제
                                 </button>
-                                <button className="flex-1 py-2 px-4 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                                <button
+                                    onClick={() => setBillingCycle("yearly")}
+                                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${billingCycle === "yearly"
+                                            ? "bg-white dark:bg-primary shadow-sm text-slate-900 dark:text-white"
+                                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                        }`}
+                                >
                                     연간 결제
                                 </button>
                             </div>
@@ -56,8 +73,10 @@ export default function PaymentPage() {
                                         <p className="text-sm text-slate-500 dark:text-slate-400">파워 유저를 위한 기능</p>
                                     </div>
                                     <div className="text-right">
-                                        <span className="text-2xl font-bold">월 9,900원</span>
-                                        <span className="block text-[10px] text-slate-400 font-medium">VAT 포함</span>
+                                        <span className="text-2xl font-bold">{priceLabel} {price}원</span>
+                                        <span className="block text-[10px] text-slate-400 font-medium">
+                                            {discount || "VAT 포함"}
+                                        </span>
                                     </div>
                                 </div>
                                 <ul className="space-y-4 mb-8">
@@ -74,7 +93,9 @@ export default function PaymentPage() {
                                         </li>
                                     ))}
                                 </ul>
-                                <Button fullWidth size="lg" onClick={() => setIsCheckout(true)}>9,900원 정기 결제 시작</Button>
+                                <Button fullWidth size="lg" onClick={() => setIsCheckout(true)}>
+                                    {price}원 정기 결제 시작
+                                </Button>
                             </Card>
                             <Card className="bg-white/50 dark:bg-[#1a242e]/40 border-slate-200 dark:border-primary/10 p-6 flex flex-col opacity-80">
                                 <div className="flex justify-between items-start mb-6">
