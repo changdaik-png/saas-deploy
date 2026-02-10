@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processDuePayments } from "../../../utils/billing/batch";
+import { processDuePayments } from "../../../../utils/billing/batch";
 
 export async function GET(req: NextRequest) {
     // 보안: Vercel Cron Job에서 호출했는지 확인 (Authorization 헤더 검사)
